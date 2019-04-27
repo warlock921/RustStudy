@@ -281,7 +281,7 @@ const GLOBAL: i32 = 0;
 
 ### 基本数据类型
 
-	#### bool 类型
+#### bool 类型
 
 * 布尔类型（ bool ) 代表的是“ 是 ” 和 “ 否 ” 的二值逻辑。它有两个值：true 和 false
 
@@ -319,3 +319,114 @@ if a >= b {
   ```
 
   *char 类型设计的目的是描述任意一个 unicode，占据的内存空间不是1个字节，而是4个字节*
+
+* 对于 ASCII字符其实只需占用一个字节的空间，因此 **Rust** 提供了单字节字符字面量来表示 ASCII 字符。
+
+  ```rust
+  let x :u8 = 1;
+  println!("{}", x);
+  
+  let y :u8 = b'A';
+  println!("{}", y);
+  
+  let _s :&[u8;5] = b"hello";
+  
+  let _r :&[u8;14] = br#"hello \n world"#;
+  //使用一个字母 b 在字符或者字符串前面，代表这个字面量存储在 u8 类型数组中，占用空间比 char 型数组小
+  ```
+
+  
+
+#### 整数类型
+
+| 整数类型 | 有符号 | 无符号 |
+| :----------: | :----: | :----: |
+|    8 bits    |   i8   |   u8   |
+|   16 bits    |  i16   |  u16   |
+|   32 bits    |  i32   |  u32   |
+|   64 bits    |  i64   |  u64   |
+|   128 bits   |  i128  |  u128  |
+| Pointer size | isize  | usize  |
+
+*所谓有符号/无符号，指的是如何理解内存空间中的bit表达的含义*
+
+1. 如果一个变量是有符号类型，那么它的最高位的那一个 bit 就是 ”符号位“ ，表示该数为正值还是负值
+2. 如果一个变量是无符号类型，那么它的最高位和其他位一样，表示该数的大小
+3. 特别注意的是 isize 和 usize 类型，它们占据的空间是不定的，与指针占据的空间一致，与所在的平台相关
+
+_在所有的数字字面量中，可以在任意地方添加任意的下划线，以方便阅读：_
+
+```rust
+let var1 = 0x_1234_ABCD; //使用下划线分割数字，不影响语义，但是极大地提升了阅读体验
+```
+
+**在 Rust 中， 我们可以为任何一个类型添加方法，整形也不例外。**
+
+```rust
+let x : i32 = 9;
+println!("9 power 3 = {}", x.pow(3));
+println!("9 power 3 = {}", 9_i32.pow(3));
+//这是非常方便的设计
+```
+
+_另外，对于整数类型，如果 **Rust** 无法判断变量的具体类型，则自动默认为 i32 类型_
+
+#### 整数溢出
+
+直接上例子：
+
+```rust
+fn arithmetic(m: i8, n: i8) {
+    //加法运算，有溢出风险
+    println!("{}", m + n);
+}
+fn main() {
+    let m: i8 = 120;
+    let n: i8 = 120;
+    arithmetic(m, n);
+}
+// i8 为有符号类型，取值范围：-128 ~ 127 ，以上结果会产生溢出
+//执行程序后，结果为：
+//thread 'main' panicked at 'attempt to add with overflow', src/main.rs:3:20
+//程序执行时发生了 panic
+//可以使用： rustc -O 文件名.rs 编译，执行时没有错误，但是采用了自动截断的策略
+//以上程序是 debug 版本，项目中不要这么做，会埋下炸弹
+```
+
+如果在某些场景下，用户确定需要更精细地自主控制整数溢出的行为，可以调用标准库中的：
+
+```rust
+checked_*
+saturating_*
+warpping_*
+```
+
+```rust
+fn main() {
+    let i = 100_i8;
+    println!("checked {:?}", i.checked_add(i));
+    println!("saturating {:?}", i.saturating_add(i));
+    println!("warpping {:?}", i.wrapping_add(i));
+}
+//结果：
+// checked None  --  checked_* 系列函数返回的类型是 Option<_>，当出现溢出的时候，返回值是None
+// saturating 127  --  saturating_* 系列函数返回类型是整数，如果溢出，则给出该类型可表示范围的“最大/最小”值
+// warpping -56 -- warpping_* 系列函数则是直接抛弃已经溢出的最高位，将剩下的部分返回
+// 在对安全性要求非常高的情况下，强烈建议尽量使用这几个方法替代默认的算术运算符做数学运算，这样表意更清晰
+
+```
+
+标准库中还提供了一个叫作：std::num::Wrapping<T>的类型。
+
+```rust
+use std::num::Wrapping;
+
+fn main() {
+    let big = Wrapping(std::u32::MAX);
+    let sum = big + Wrapping(2_u32);
+    println!("{}", sum.0);
+}
+// 它重载了算术运算符，可以被当成普通整数使用，凡是被它包裹起来的整数，任何时候出现溢出都是截断
+// 上述代码，不论使用什么编译选项，都不会触发 panic 
+```
+
